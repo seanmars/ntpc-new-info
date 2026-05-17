@@ -196,6 +196,11 @@ csharp_space_between_square_brackets = false
 csharp_preserve_single_line_blocks = true
 csharp_preserve_single_line_statements = true
 
+# ReSharper / Rider wrapping preferences (object & collection initializers)
+resharper_csharp_wrap_object_and_collection_initializer_style = chop_always
+resharper_csharp_place_simple_initializer_on_single_line = false
+resharper_csharp_max_initializer_elements_on_line = 1
+
 #### Naming styles ####
 [*.{cs,vb}]
 
@@ -244,10 +249,6 @@ dotnet_naming_rule.public_fields_should_be_pascalcase.style = pascalcase
 dotnet_naming_rule.private_fields_should_be__camelcase.severity = suggestion
 dotnet_naming_rule.private_fields_should_be__camelcase.symbols = private_fields
 dotnet_naming_rule.private_fields_should_be__camelcase.style = _camelcase
-
-dotnet_naming_rule.private_static_fields_should_be_s_camelcase.severity = suggestion
-dotnet_naming_rule.private_static_fields_should_be_s_camelcase.symbols = private_static_fields
-dotnet_naming_rule.private_static_fields_should_be_s_camelcase.style = s_camelcase
 
 dotnet_naming_rule.public_constant_fields_should_be_pascalcase.severity = suggestion
 dotnet_naming_rule.public_constant_fields_should_be_pascalcase.symbols = public_constant_fields
@@ -381,9 +382,3 @@ dotnet_naming_style.camelcase.required_prefix =
 dotnet_naming_style.camelcase.required_suffix = 
 dotnet_naming_style.camelcase.word_separator = 
 dotnet_naming_style.camelcase.capitalization = camel_case
-
-dotnet_naming_style.s_camelcase.required_prefix = s_
-dotnet_naming_style.s_camelcase.required_suffix = 
-dotnet_naming_style.s_camelcase.word_separator = 
-dotnet_naming_style.s_camelcase.capitalization = camel_case
-
