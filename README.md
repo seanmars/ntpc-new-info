@@ -98,6 +98,19 @@ pnpm dev
 
 開發模式下提供 Scalar UI: `http://localhost:5129/scalar/v1`
 
+### Discord 通知 (選用)
+
+當監測點被救援事件命中時, 可透過 Discord bot 發送訊息到指定 channel.
+
+啟用步驟:
+
+1. 於 [Discord Developer Portal](https://discord.com/developers/applications) 建立 application, 在「Bot」分頁建立 bot 並複製 token.
+2. 將 bot 邀請到目標 Discord server, 確認 bot 在目標 channel 具有 `Send Messages` 權限.
+3. 啟動 WebApi, 於前端 `/settings` 頁開啟「Discord 通知」區塊, 填入 bot token + channel id 並勾選啟用.
+
+設定會永久化至 `src/WebApi/data/discord-settings.json` (已被 `.gitignore` 排除).
+Token 預設不會回傳於 `GET /api/settings/discord`, 僅顯示末 4 碼遮罩預覽; 後續更新時若 token 欄位留空則保留既有值.
+
 ## 前端
 
 預設於 `/` 路由顯示全螢幕 Leaflet 地圖, 中心為新北市政府 (約 `25.0124, 121.4651`, zoom 11).

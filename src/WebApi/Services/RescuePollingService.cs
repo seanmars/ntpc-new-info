@@ -1,5 +1,8 @@
+using System.Text.Json.Nodes;
+
 using Microsoft.Extensions.Options;
 
+using WebApi.Messaging;
 using WebApi.Options;
 
 namespace WebApi.Services;
@@ -7,6 +10,7 @@ namespace WebApi.Services;
 public sealed class RescuePollingService(
     RescueDataFetcher fetcher,
     IRescueSnapshotStore store,
+    IMonitorPointEventDetector detector,
     IOptionsMonitor<RescuePollingOptions> options,
     ILogger<RescuePollingService> logger) : BackgroundService
 {
@@ -45,6 +49,9 @@ public sealed class RescuePollingService(
             logger.LogInformation(
                 "Rescue poll succeeded from {Url} in {ElapsedMs} ms.",
                 url, (DateTimeOffset.UtcNow - started).TotalMilliseconds);
+
+            var fetchedAt = store.Current.FetchedAt ?? DateTimeOffset.UtcNow;
+            await SafeDetectAsync(data, fetchedAt, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -54,6 +61,22 @@ public sealed class RescuePollingService(
         {
             store.SetFailure(ex.Message);
             logger.LogError(ex, "Rescue poll failed against {Url}.", url);
+        }
+    }
+
+    private async Task SafeDetectAsync(JsonNode data, DateTimeOffset fetchedAt, CancellationToken ct)
+    {
+        try
+        {
+            await detector.DetectAndPublishAsync(data, fetchedAt, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Monitor point event detection failed.");
         }
     }
 }

@@ -1,7 +1,13 @@
 using Microsoft.Extensions.Options;
 
+using Rebus.Config;
+using Rebus.ServiceProvider;
+using Rebus.Transport.InMem;
+
 using Scalar.AspNetCore;
 
+using WebApi.Discord;
+using WebApi.Messaging;
 using WebApi.Options;
 using WebApi.Services;
 
@@ -24,10 +30,16 @@ builder.Services
 builder.Services
     .Configure<NominatimOptions>(
         builder.Configuration.GetSection(NominatimOptions.SectionName));
+builder.Services
+    .Configure<DiscordSettingsStoreOptions>(
+        builder.Configuration.GetSection(DiscordSettingsStoreOptions.SectionName));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IRescueSnapshotStore, RescueSnapshotStore>();
 builder.Services.AddSingleton<IMonitorPointStore, MonitorPointStore>();
+builder.Services.AddSingleton<IDiscordSettingsStore, DiscordSettingsStore>();
+builder.Services.AddSingleton<DiscordBotState>();
+builder.Services.AddSingleton<IDiscordNotifier, DiscordRestNotifier>();
 
 builder.Services.AddHttpClient<RescueDataFetcher>((sp, client) =>
 {
@@ -44,7 +56,13 @@ builder.Services.AddHttpClient<NominatimGeocoder>((sp, client) =>
     client.DefaultRequestHeaders.UserAgent.ParseAdd(opts.UserAgent);
 });
 
+builder.Services.AddSingleton<IMonitorPointEventDetector, MonitorPointEventDetector>();
+builder.Services.AutoRegisterHandlersFromAssemblyOf<LoggingMonitorPointAlertHandler>();
+builder.Services.AddRebus(configure => configure
+    .Transport(t => t.UseInMemoryTransport(new InMemNetwork(), "monitor-point-alerts")));
+
 builder.Services.AddHostedService<RescuePollingService>();
+builder.Services.AddHostedService<DiscordBotLifecycleService>();
 
 var app = builder.Build();
 
