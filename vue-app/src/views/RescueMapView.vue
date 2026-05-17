@@ -1,14 +1,34 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 import RescueMap from '@/components/RescueMap.vue';
 import { useRescueData } from '@/composables/useRescueData';
+import { useMonitorPoints } from '@/composables/useMonitorPoints';
+import { useCollapsibleGroups } from '@/composables/useCollapsibleGroups';
 import type { RescueFeature } from '@/types/rescue';
+import type { MonitorPoint } from '@/types/monitorPoint';
 import { colorFor, featureKey } from '@/utils/rescue';
 
 const { featureCollection, meta, error, isLoading, lastFetchedAt, refresh } = useRescueData();
+const { points: monitorPoints } = useMonitorPoints({ autoPoll: true });
+
+type SidebarGroup = 'rescue' | 'monitor';
+const { groups: sidebarGroups, toggle: toggleGroup } = useCollapsibleGroups<SidebarGroup>(
+  'rescue-map.sidebar.groups',
+  { rescue: true, monitor: true },
+);
+
+const { groups: monitorOptions } = useCollapsibleGroups<'showRangeCircle'>(
+  'rescue-map.sidebar.monitor-options',
+  { showRangeCircle: true },
+);
 
 const mapRef = ref<InstanceType<typeof RescueMap> | null>(null);
 const selectedFeatureId = ref<string | null>(null);
+const pinnedMonitorId = ref<string | null>(null);
+const hoveredMonitorId = ref<string | null>(null);
+
+const focusedMonitorId = computed(() => pinnedMonitorId.value ?? hoveredMonitorId.value);
 
 const timeFormatter = new Intl.DateTimeFormat('zh-TW', {
   year: 'numeric',
@@ -27,6 +47,10 @@ function formatTime(input: string | Date | null | undefined): string {
   return timeFormatter.format(date);
 }
 
+function formatCoord(value: number): string {
+  return value.toFixed(6);
+}
+
 const fetchedAtLabel = computed(() => {
   if (meta.value?.fetchedAt) return formatTime(meta.value.fetchedAt);
   if (lastFetchedAt.value) return formatTime(lastFetchedAt.value);
@@ -35,6 +59,7 @@ const fetchedAtLabel = computed(() => {
 
 const features = computed(() => featureCollection.value?.features ?? []);
 const featureCount = computed(() => features.value.length);
+const monitorCount = computed(() => monitorPoints.value.length);
 
 const upstreamError = computed(() => {
   if (!meta.value?.lastError) return null;
@@ -55,10 +80,33 @@ const showEmpty = computed(
   () => !isPending.value && !failure.value && featureCollection.value !== null && featureCount.value === 0,
 );
 
-function handleSelect(feature: RescueFeature, index: number) {
+function handleSelectFeature(feature: RescueFeature, index: number) {
   const key = featureKey(feature, index);
   selectedFeatureId.value = key;
+  pinnedMonitorId.value = null;
   mapRef.value?.focusFeature(key);
+}
+
+function handleMonitorClick(point: MonitorPoint) {
+  pinnedMonitorId.value = pinnedMonitorId.value === point.id ? null : point.id;
+  selectedFeatureId.value = null;
+  if (pinnedMonitorId.value) {
+    mapRef.value?.focusMonitor(point.id);
+  }
+}
+
+function handleMonitorEnter(point: MonitorPoint) {
+  hoveredMonitorId.value = point.id;
+}
+
+function handleMonitorLeave(point: MonitorPoint) {
+  if (hoveredMonitorId.value === point.id) {
+    hoveredMonitorId.value = null;
+  }
+}
+
+function handleMapHoverMonitor(id: string | null) {
+  hoveredMonitorId.value = id;
 }
 </script>
 
@@ -66,7 +114,7 @@ function handleSelect(feature: RescueFeature, index: number) {
   <div class="rescue-page">
     <header class="status-bar">
       <div class="status-bar__main">
-        <h1 class="status-bar__title">新北市即時救援</h1>
+        <h1 class="status-bar__title">即時災訊</h1>
         <span class="status-bar__chip">資料時間: {{ fetchedAtLabel }}</span>
         <span v-if="featureCount > 0" class="status-bar__chip status-bar__chip--info">
           進行中事件: {{ featureCount }}
@@ -74,9 +122,12 @@ function handleSelect(feature: RescueFeature, index: number) {
         <span v-if="showEmpty" class="status-bar__chip status-bar__chip--muted"> 目前無進行中的救援事件 </span>
       </div>
 
-      <button type="button" class="status-bar__refresh" :disabled="isLoading" @click="refresh">
-        {{ isLoading ? '載入中...' : '重新整理' }}
-      </button>
+      <div class="status-bar__actions">
+        <RouterLink to="/settings" class="status-bar__link">設定</RouterLink>
+        <button type="button" class="status-bar__refresh" :disabled="isLoading" @click="refresh">
+          {{ isLoading ? '載入中...' : '重新整理' }}
+        </button>
+      </div>
     </header>
 
     <div v-if="isPending" class="banner banner--pending">資料尚未就緒, 將自動重試...</div>
@@ -90,33 +141,105 @@ function handleSelect(feature: RescueFeature, index: number) {
     </div>
 
     <div class="body">
-      <aside class="sidebar" aria-label="救援事件清單">
-        <div class="sidebar__header">事件清單 ({{ featureCount }})</div>
-        <ul v-if="featureCount > 0" class="sidebar__list">
-          <li
-            v-for="(feature, index) in features"
-            :key="featureKey(feature, index)"
-            class="sidebar__item"
-            :class="{ 'sidebar__item--active': selectedFeatureId === featureKey(feature, index) }"
-            @click="handleSelect(feature, index)"
+      <aside class="sidebar" aria-label="側邊欄">
+        <section
+          class="group"
+          :class="{ 'group--collapsed': !sidebarGroups.rescue }"
+        >
+          <button
+            type="button"
+            class="group__header"
+            :aria-expanded="sidebarGroups.rescue"
+            @click="toggleGroup('rescue')"
           >
-            <span class="sidebar__color" :style="{ backgroundColor: colorFor(index) }" aria-hidden="true"></span>
-            <div class="sidebar__text">
-              <div class="sidebar__type">
-                {{ feature.properties.fireType ?? feature.properties.title ?? '救援事件' }}
-              </div>
-              <div class="sidebar__addr">{{ feature.properties.endPointInfo ?? '-' }}</div>
-              <div class="sidebar__meta">
-                #{{ feature.properties.featureId ?? '?' }} · 出勤 {{ feature.properties.caseList?.length ?? 0 }} 車
-              </div>
+            <span class="group__caret" aria-hidden="true">{{ sidebarGroups.rescue ? '▾' : '▸' }}</span>
+            <span class="group__title">災情狀況 ({{ featureCount }})</span>
+          </button>
+          <div v-if="sidebarGroups.rescue" class="group__body">
+            <ul v-if="featureCount > 0" class="group__list">
+              <li
+                v-for="(feature, index) in features"
+                :key="featureKey(feature, index)"
+                class="row row--rescue"
+                :class="{ 'row--active': selectedFeatureId === featureKey(feature, index) }"
+                @click="handleSelectFeature(feature, index)"
+              >
+                <span class="row__color" :style="{ backgroundColor: colorFor(index) }" aria-hidden="true"></span>
+                <div class="row__text">
+                  <div class="row__type">
+                    {{ feature.properties.fireType ?? feature.properties.title ?? '救援事件' }}
+                  </div>
+                  <div class="row__addr">{{ feature.properties.endPointInfo ?? '-' }}</div>
+                  <div class="row__meta">
+                    #{{ feature.properties.featureId ?? '?' }} · 出勤 {{ feature.properties.caseList?.length ?? 0 }} 車
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <div v-else class="group__empty">目前無事件</div>
+          </div>
+        </section>
+
+        <section
+          class="group"
+          :class="{ 'group--collapsed': !sidebarGroups.monitor }"
+        >
+          <button
+            type="button"
+            class="group__header"
+            :aria-expanded="sidebarGroups.monitor"
+            @click="toggleGroup('monitor')"
+          >
+            <span class="group__caret" aria-hidden="true">{{ sidebarGroups.monitor ? '▾' : '▸' }}</span>
+            <span class="group__title">自設追蹤 ({{ monitorCount }})</span>
+          </button>
+          <div v-if="sidebarGroups.monitor" class="group__body">
+            <div class="group__toolbar">
+              <label class="toolbar-check">
+                <input
+                  type="checkbox"
+                  v-model="monitorOptions.showRangeCircle"
+                />
+                <span>顯示範圍圓圈</span>
+              </label>
             </div>
-          </li>
-        </ul>
-        <div v-else class="sidebar__empty">目前無事件</div>
+            <ul v-if="monitorCount > 0" class="group__list">
+              <li
+                v-for="point in monitorPoints"
+                :key="point.id"
+                class="row row--monitor"
+                :class="{
+                  'row--active': pinnedMonitorId === point.id,
+                  'row--hover': pinnedMonitorId !== point.id && hoveredMonitorId === point.id,
+                }"
+                @click="handleMonitorClick(point)"
+                @mouseenter="handleMonitorEnter(point)"
+                @mouseleave="handleMonitorLeave(point)"
+              >
+                <span class="row__color row__color--monitor" aria-hidden="true"></span>
+                <div class="row__text">
+                  <div class="row__type">{{ point.name }}</div>
+                  <div class="row__addr">
+                    lat {{ formatCoord(point.latitude) }}, lng {{ formatCoord(point.longitude) }}
+                  </div>
+                  <div class="row__meta">半徑 {{ point.radius }} m</div>
+                </div>
+              </li>
+            </ul>
+            <div v-else class="group__empty">尚未新增自設追蹤點</div>
+          </div>
+        </section>
       </aside>
 
       <main class="map-wrapper">
-        <RescueMap ref="mapRef" :feature-collection="featureCollection" />
+        <RescueMap
+          ref="mapRef"
+          :feature-collection="featureCollection"
+          :monitor-points="monitorPoints"
+          :focused-monitor-id="focusedMonitorId"
+          :show-range-circle="monitorOptions.showRangeCircle"
+          @hover-monitor="handleMapHoverMonitor"
+        />
       </main>
     </div>
   </div>
@@ -173,6 +296,27 @@ function handleSelect(feature: RescueFeature, index: number) {
   background: transparent;
   color: #888;
   font-style: italic;
+}
+
+.status-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-bar__link {
+  font-size: 13px;
+  color: #2a9d8f;
+  text-decoration: none;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.status-bar__link:hover,
+.status-bar__link:focus-visible {
+  border-color: #2a9d8f;
+  outline: none;
 }
 
 .status-bar__refresh {
@@ -237,16 +381,64 @@ function handleSelect(feature: RescueFeature, index: number) {
   min-height: 0;
 }
 
-.sidebar__header {
+.group {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid #eee;
+}
+
+.group:last-child {
+  border-bottom: none;
+}
+
+.group:not(.group--collapsed) {
+  flex: 1 1 0;
+}
+
+.group__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
   color: #555;
-  border-bottom: 1px solid #eee;
   background: #fafafa;
+  border: none;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  text-align: left;
 }
 
-.sidebar__list {
+.group--collapsed .group__header {
+  border-bottom: none;
+}
+
+.group__header:hover {
+  background: #f0f0f3;
+}
+
+.group__caret {
+  display: inline-block;
+  width: 12px;
+  color: #888;
+  font-size: 11px;
+}
+
+.group__title {
+  flex: 1 1 auto;
+}
+
+.group__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.group__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -254,7 +446,35 @@ function handleSelect(feature: RescueFeature, index: number) {
   flex: 1 1 auto;
 }
 
-.sidebar__item {
+.group__toolbar {
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fcfcfd;
+}
+
+.toolbar-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toolbar-check input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.group__empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: #999;
+  font-style: italic;
+}
+
+.row {
   display: flex;
   gap: 10px;
   padding: 10px 14px;
@@ -263,15 +483,19 @@ function handleSelect(feature: RescueFeature, index: number) {
   transition: background 0.12s;
 }
 
-.sidebar__item:hover {
+.row:hover {
   background: #f5f9ff;
 }
 
-.sidebar__item--active {
+.row--active {
   background: #e3f2fd;
 }
 
-.sidebar__color {
+.row--hover {
+  background: #f0f7ff;
+}
+
+.row__color {
   flex: 0 0 10px;
   width: 10px;
   height: 10px;
@@ -279,35 +503,32 @@ function handleSelect(feature: RescueFeature, index: number) {
   margin-top: 6px;
 }
 
-.sidebar__text {
+.row__color--monitor {
+  background-color: #1976d2;
+}
+
+.row__text {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.sidebar__type {
+.row__type {
   font-size: 13px;
   font-weight: 600;
   color: #222;
 }
 
-.sidebar__addr {
+.row__addr {
   font-size: 12px;
   color: #555;
   margin-top: 2px;
   word-break: break-all;
 }
 
-.sidebar__meta {
+.row__meta {
   font-size: 11px;
   color: #888;
   margin-top: 3px;
-}
-
-.sidebar__empty {
-  padding: 16px 14px;
-  font-size: 13px;
-  color: #999;
-  font-style: italic;
 }
 
 .map-wrapper {

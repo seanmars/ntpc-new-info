@@ -18,15 +18,30 @@ builder.Services.AddOpenApi();
 builder.Services
     .Configure<RescuePollingOptions>(
         builder.Configuration.GetSection(RescuePollingOptions.SectionName));
+builder.Services
+    .Configure<MonitorPointStoreOptions>(
+        builder.Configuration.GetSection(MonitorPointStoreOptions.SectionName));
+builder.Services
+    .Configure<NominatimOptions>(
+        builder.Configuration.GetSection(NominatimOptions.SectionName));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IRescueSnapshotStore, RescueSnapshotStore>();
+builder.Services.AddSingleton<IMonitorPointStore, MonitorPointStore>();
 
 builder.Services.AddHttpClient<RescueDataFetcher>((sp, client) =>
 {
     var opts = sp.GetRequiredService<IOptions<RescuePollingOptions>>().Value;
     client.Timeout = opts.RequestTimeout;
     client.DefaultRequestHeaders.UserAgent.ParseAdd("ntpc-new-info-backend/0.1");
+});
+
+builder.Services.AddHttpClient<NominatimGeocoder>((sp, client) =>
+{
+    var opts = sp.GetRequiredService<IOptions<NominatimOptions>>().Value;
+    client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = opts.RequestTimeout;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(opts.UserAgent);
 });
 
 builder.Services.AddHostedService<RescuePollingService>();

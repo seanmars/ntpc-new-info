@@ -1,0 +1,182 @@
+## ADDED Requirements
+
+### Requirement: 設定頁面路由與佈局
+前端 SHALL 提供 `/settings` 路由, 渲染一個獨立的設定頁面, 頁面 SHALL 顯示「監測點」區塊, 包含「新增監測點」按鈕與目前已儲存的監測點清單; 並 SHALL 提供返回救援地圖頁的導覽連結.
+
+#### Scenario: 進入設定頁
+- **WHEN** 使用者在瀏覽器訪問 `/settings`
+- **THEN** 系統 SHALL 渲染設定頁, 顯示「新增監測點」按鈕與監測點清單區塊, 不 SHALL 拋出例外
+
+#### Scenario: 從設定頁返回地圖
+- **WHEN** 使用者於設定頁點擊「返回地圖」(或同等連結)
+- **THEN** 系統 SHALL 導覽至 `/`, 不 SHALL 失去頁面狀態 (例如已開啟的對話框 SHALL 被關閉)
+
+### Requirement: 監測點清單顯示與重新整理
+設定頁 SHALL 在 mount 時呼叫 `GET /api/monitor-points` 取得清單, 並依 `createdAt` 由舊到新排序顯示; 每一項 SHALL 顯示 `name`, `latitude` (小數至 6 位), `longitude` (小數至 6 位), 與「刪除」按鈕.
+
+#### Scenario: 載入並顯示清單
+- **WHEN** 設定頁 mount 完成且 API 回傳 N 個監測點
+- **THEN** 清單 SHALL 顯示 N 個項目, 每項皆有名稱、座標與刪除按鈕
+
+#### Scenario: 空清單提示
+- **WHEN** API 回傳空陣列
+- **THEN** 設定頁 SHALL 顯示「尚未新增任何監測點」提示, SHALL NOT 顯示空列項
+
+#### Scenario: 載入失敗
+- **WHEN** API 呼叫失敗 (網路錯誤或非 2xx)
+- **THEN** 設定頁 SHALL 顯示錯誤訊息與「重試」按鈕, SHALL NOT 導致頁面崩潰
+
+### Requirement: 新增監測點對話框與三種輸入方式
+點擊「新增監測點」按鈕 SHALL 開啟對話框 (modal), 對話框 SHALL 提供三種輸入分頁 (tabs): `GPS`, `搜尋地址`, `手動輸入`; 三者皆 SHALL 包含一個必填的 `name` 欄位 (1-50 字元), 並在按下「儲存」時將 `{ name, latitude, longitude }` 透過 `POST /api/monitor-points` 送出.
+
+#### Scenario: 開啟與關閉對話框
+- **WHEN** 使用者點擊「新增監測點」
+- **THEN** 對話框 SHALL 開啟並預設聚焦於 `name` 欄位; 按下「取消」或關閉鍵 SHALL 關閉對話框且 SHALL NOT 送出 API 請求
+
+#### Scenario: name 驗證
+- **WHEN** 使用者點擊「儲存」但 `name` 為空或超過 50 字元
+- **THEN** 系統 SHALL 顯示欄位錯誤提示, SHALL NOT 呼叫 API
+
+#### Scenario: 儲存成功後刷新清單
+- **WHEN** `POST /api/monitor-points` 回傳 HTTP 201
+- **THEN** 對話框 SHALL 關閉, 清單 SHALL 立即新增該筆 (本地 append 或重抓清單均可), SHALL 顯示成功提示 (例如 toast 或文字)
+
+#### Scenario: 儲存失敗
+- **WHEN** API 回傳 4xx/5xx 或網路失敗
+- **THEN** 對話框 SHALL 保持開啟, 顯示錯誤訊息, SHALL NOT 關閉對話框, 使用者輸入 SHALL 保留以便修改
+
+### Requirement: GPS 取得當前位置
+GPS 分頁 SHALL 提供「使用目前位置」按鈕, 點擊後 SHALL 呼叫 `navigator.geolocation.getCurrentPosition` 並將回傳座標填入唯讀的座標預覽欄位; 取得失敗時 SHALL 顯示原因.
+
+#### Scenario: 成功取得 GPS
+- **WHEN** 使用者點擊「使用目前位置」且瀏覽器准許定位權限
+- **THEN** 系統 SHALL 在 GPS 分頁顯示 lat/lng 預覽 (小數至 6 位), 並使「儲存」按鈕可用
+
+#### Scenario: 使用者拒絕權限
+- **WHEN** 瀏覽器 geolocation 回應 `PERMISSION_DENIED`
+- **THEN** 系統 SHALL 顯示「無法存取定位權限, 請改用搜尋或手動輸入」提示, SHALL NOT 失敗導致對話框崩潰
+
+#### Scenario: 瀏覽器不支援 geolocation
+- **WHEN** `navigator.geolocation` 未定義
+- **THEN** GPS 分頁 SHALL 顯示提示文字, 並 SHALL 禁用「使用目前位置」按鈕
+
+### Requirement: 地址搜尋輸入方式
+搜尋分頁 SHALL 提供查詢輸入框, 使用者輸入後 (含 debounce 300ms) SHALL 呼叫 `GET /api/geocode/search?q=...&limit=5`, 將回傳的候選清單以列表形式呈現; 點擊任一候選 SHALL 將其 `displayName` 填入 name (若 name 仍為空) 並選定為當前 lat/lng.
+
+#### Scenario: 輸入查詢顯示候選
+- **WHEN** 使用者輸入「台北101」並等待 debounce
+- **THEN** 系統 SHALL 呼叫 backend geocode endpoint, 並顯示最多 5 筆候選 (每筆顯示 `displayName`)
+
+#### Scenario: 選定候選
+- **WHEN** 使用者點擊某一候選
+- **THEN** 系統 SHALL 將該筆 `latitude`/`longitude` 設為當前選擇, 若 `name` 欄位仍為空 SHALL 以 `displayName` 預填, 並使「儲存」按鈕可用
+
+#### Scenario: 無結果
+- **WHEN** geocode 回傳空陣列
+- **THEN** 系統 SHALL 顯示「找不到符合的地點」提示
+
+#### Scenario: 後端代理失敗
+- **WHEN** `/api/geocode/search` 回應非 2xx
+- **THEN** 系統 SHALL 顯示錯誤訊息, SHALL NOT 阻擋使用者切換到其他分頁繼續輸入
+
+### Requirement: 手動輸入座標
+手動分頁 SHALL 提供兩個數值輸入框 (`lat`, `lng`), 使用者輸入後 SHALL 即時驗證 lat ∈ [-90, 90], lng ∈ [-180, 180]; 違規時 SHALL 顯示欄位錯誤提示, 違規期間 SHALL 禁用「儲存」按鈕.
+
+#### Scenario: 合法輸入
+- **WHEN** 使用者於 `lat` 輸入 25.034, `lng` 輸入 121.564, 且 `name` 已填寫
+- **THEN** 「儲存」按鈕 SHALL 可用, 送出後 SHALL 呼叫 `POST /api/monitor-points`
+
+#### Scenario: lat 超出範圍
+- **WHEN** 使用者於 `lat` 輸入 95
+- **THEN** 系統 SHALL 即時顯示「lat 必須介於 -90 ~ 90」, 「儲存」按鈕 SHALL 為 disabled
+
+#### Scenario: 非數值輸入
+- **WHEN** 使用者於 `lat` 輸入非數值文字
+- **THEN** 系統 SHALL 顯示欄位錯誤, SHALL NOT 將 NaN 送至 API
+
+### Requirement: 對話框內預覽地圖與可拖曳標記
+新增監測點對話框 SHALL 在三個輸入分頁下方顯示一個小型 Leaflet 預覽地圖, 當使用者透過任一輸入方式選定座標後, 地圖 SHALL 在該座標上以可拖曳的標記呈現; 使用者拖曳該標記 SHALL 更新目前選定座標, 並 SHALL 同步反映至手動分頁的 `lat`/`lng` 欄位 (若目前正位於手動分頁).
+
+#### Scenario: 選定座標後顯示標記
+- **WHEN** 使用者透過 GPS / 搜尋 / 手動輸入任一方式選定座標 (`selectedCoords` 由 null 變為非 null)
+- **THEN** 預覽地圖 SHALL 在該座標上建立可拖曳的標記 (`L.marker(..., { draggable: true })`), 並 SHALL 將地圖視角 panTo 至該座標
+
+#### Scenario: 拖曳標記調整座標
+- **WHEN** 使用者拖曳標記後放開
+- **THEN** 系統 SHALL 將標記新位置 (取小數 6 位) 寫回 `selectedCoords`, 「儲存」按鈕 SHALL 維持可用 (前提是 `name` 合法), 且若使用者位於手動分頁, `lat`/`lng` 欄位 SHALL 同步更新為新值
+
+#### Scenario: 點擊地圖建立或移動標記
+- **WHEN** 使用者點擊地圖任意位置
+- **THEN** 系統 SHALL 將點擊座標 (取小數 6 位) 設為 `selectedCoords`, 若已有標記 SHALL 移動該標記到點擊位置, 若尚無標記 SHALL 新建可拖曳標記
+
+#### Scenario: 對話框關閉清理地圖
+- **WHEN** 使用者關閉對話框 (`props.open` 由 true 變 false)
+- **THEN** 系統 SHALL 呼叫 `map.remove()` 釋放 Leaflet 資源, 避免重複開關造成記憶體洩漏
+
+#### Scenario: 預設地圖中心
+- **WHEN** 對話框開啟且尚未選定任何座標
+- **THEN** 預覽地圖 SHALL 以新北市政府座標 (`25.0124, 121.4651`) 為中心, zoom level 11 顯示, SHALL 不顯示任何標記
+
+### Requirement: 刪除監測點
+監測點清單每一項 SHALL 提供刪除按鈕, 點擊後 SHALL 先顯示確認對話框, 確認後 SHALL 呼叫 `DELETE /api/monitor-points/{id}`, 成功後 SHALL 自清單中移除該項目.
+
+#### Scenario: 確認刪除
+- **WHEN** 使用者點擊刪除按鈕並於確認對話框點擊「確認」
+- **THEN** 系統 SHALL 呼叫 DELETE API, 成功 (204) 後 SHALL 自清單移除該項目並顯示成功提示
+
+#### Scenario: 取消刪除
+- **WHEN** 使用者於確認對話框點擊「取消」
+- **THEN** 對話框 SHALL 關閉, SHALL NOT 呼叫 API, 清單 SHALL NOT 變更
+
+#### Scenario: 刪除失敗
+- **WHEN** DELETE API 回應非 2xx
+- **THEN** 系統 SHALL 顯示錯誤訊息, 清單 SHALL 維持原狀, 使用者 SHALL 可重試
+
+### Requirement: 編輯既有監測點
+設定頁清單每一項 SHALL 提供「編輯」按鈕, 點擊後 SHALL 開啟與新增相同的對話框 (`MonitorPointForm`), 但以「編輯模式」運作: 對話框標題 SHALL 顯示「編輯監測點」, `name` SHALL 預填為目前值, `selectedCoords` SHALL 預填為目前 lat/lng, 預設分頁 SHALL 為「手動輸入」並將 `lat`/`lng` 欄位填入既有座標; 「儲存」按鈕點擊後 SHALL 呼叫 `PUT /api/monitor-points/{id}`, 成功時 SHALL 以新物件替換清單中對應項目並關閉對話框.
+
+#### Scenario: 開啟編輯對話框預填值
+- **WHEN** 使用者點擊清單中某項目的「編輯」按鈕
+- **THEN** 對話框 SHALL 開啟, 標題 SHALL 為「編輯監測點」, `name` 欄位 SHALL 為目前值, 預覽地圖上 SHALL 立即顯示可拖曳標記於目前座標, 分頁 SHALL 預設為「手動輸入」且 `lat`/`lng` 欄位 SHALL 預填為目前值
+
+#### Scenario: 編輯成功
+- **WHEN** 使用者於編輯模式調整任一欄位後點擊「儲存」, API 回傳 HTTP 200
+- **THEN** 對話框 SHALL 關閉, 清單中對應項目 SHALL 被更新後的物件取代 (排序不變), SHALL 顯示成功提示
+
+#### Scenario: 編輯失敗保留輸入
+- **WHEN** PUT 失敗 (4xx/5xx 或網路錯誤)
+- **THEN** 對話框 SHALL 保持開啟, 顯示錯誤訊息, 使用者輸入 SHALL 保留, 清單 SHALL 維持原狀
+
+#### Scenario: 同一對話框可切換輸入方式
+- **WHEN** 使用者於編輯模式切換到 GPS 或搜尋分頁並選定新座標
+- **THEN** 對話框 SHALL 與新增模式相同地更新 `selectedCoords` 與地圖標記, 「儲存」按鈕 SHALL 提交新值至 PUT 端點
+
+#### Scenario: 取消編輯
+- **WHEN** 使用者於編輯模式按下「取消」或關閉鈕
+- **THEN** 對話框 SHALL 關閉, SHALL NOT 呼叫 API, 清單 SHALL 維持原狀
+
+### Requirement: 地圖上監測點圖層
+監測點 (來自 `GET /api/monitor-points`) SHALL 以可區別於救援事件 (圓形 circleMarker) 的圖示 (例如藍色星形或圖釘 icon 或不同形狀 marker) 顯示在既有救援地圖上, 並 SHALL 提供獨立 polling (預設 60 秒) 取得更新; 點擊監測點 marker SHALL 顯示包含 `name`, `latitude`, `longitude` 的 tooltip 或 popup.
+
+#### Scenario: 地圖渲染監測點
+- **WHEN** `GET /api/monitor-points` 回傳 N 個點
+- **THEN** 地圖上 SHALL 顯示 N 個監測點 marker, 圖示 SHALL 與救援事件可區分 (顏色、形狀或 icon 至少擇一不同)
+
+#### Scenario: 點擊監測點顯示資訊
+- **WHEN** 使用者點擊任一監測點 marker
+- **THEN** Leaflet popup 或 tooltip SHALL 顯示 `name`, `latitude`, `longitude` (小數至 6 位)
+
+#### Scenario: 自動更新
+- **WHEN** 使用者於設定頁新增或刪除監測點後切換回地圖頁
+- **THEN** 地圖 SHALL 在進入時 (mount) 立即 fetch 一次以反映變更, 並 SHALL 之後依輪詢間隔自動更新
+
+### Requirement: 監測點 composable 與型別
+前端 SHALL 提供 `useMonitorPoints` composable 統一管理監測點清單的 reactive 狀態 (`points`, `error`, `isLoading`) 與 `create`, `remove`, `refresh` 方法; 並 SHALL 在 `src/types/monitorPoint.ts` 定義 `MonitorPoint` interface (`id`, `name`, `latitude`, `longitude`, `createdAt`).
+
+#### Scenario: 設定頁與地圖頁共用清單
+- **WHEN** 設定頁透過 composable 新增監測點且導覽到地圖頁
+- **THEN** 地圖頁 SHALL 能於 mount 時取得包含新監測點的清單 (透過再次呼叫 API 或共享 store, 兩者擇一)
+
+#### Scenario: API 失敗時保留前次清單
+- **WHEN** composable 的 refresh fetch 失敗 (4xx/5xx/網路錯誤)
+- **THEN** composable SHALL 不清空既有 `points`, SHALL 將 error 暴露給呼叫端

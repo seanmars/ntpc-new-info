@@ -2,9 +2,7 @@
 
 ## Purpose
 提供 Vue 3 前端介面, 透過 Leaflet 在地圖上視覺化 `/api/rescue/latest` 回傳的救援事件與車輛路徑, 並以自動輪詢、手動重新整理與狀態列呈現資料新鮮度及錯誤狀態, 讓值勤人員能即時掌握現場狀況.
-
 ## Requirements
-
 ### Requirement: Leaflet 地圖容器與底圖
 前端應用 SHALL 在主頁面 (`/`) 中渲染一個佔滿視窗的 Leaflet 地圖, 預設中心為新北市政府座標 (約 `25.0124, 121.4651`), 預設 zoom level 為 11, 並使用 OpenStreetMap 作為底圖 tile 來源, 同時在地圖上顯示 OpenStreetMap 的 attribution.
 
@@ -85,23 +83,39 @@
 - **THEN** 系統 SHALL 在 status bar 顯示錯誤訊息與時間, 並 SHALL 繼續維持下一次輪詢排程
 
 ### Requirement: 救援事件清單側邊欄
-前端 SHALL 在地圖頁面顯示一個事件清單側邊欄 (在寬度 > 720px 時位於地圖左側, 寬度約 300px; 在 ≤720px 視窗寬度時改為位於地圖上方), 依序列出 `data.features` 中的每個事件, 點擊任一項目時 SHALL 將地圖視角移動到該事件位置並開啟其 popup, 同時將該項目標記為選取狀態.
+前端 SHALL 在地圖頁面顯示一個側邊欄 (在寬度 > 720px 時位於地圖左側, 寬度約 300px; 在 ≤720px 視窗寬度時改為位於地圖上方), 側邊欄 SHALL 由兩個獨立可摺疊群組組成: 「災情狀況」(顯示 `data.features` 的救援事件清單) 與「自設追蹤」(顯示來自 `GET /api/monitor-points` 的自設追蹤點清單). 兩個群組 SHALL 各自獨立 expand/collapse, 預設皆為 expanded; 摺疊狀態 SHALL 透過 `localStorage` (key `rescue-map.sidebar.groups`) 持久化, 重新整理頁面後 SHALL 保留前一次狀態. 「災情狀況」群組內每一項點擊時 SHALL 將地圖視角移動到該事件位置並開啟其 popup, 同時將該項目標記為選取狀態.
 
-#### Scenario: 事件清單渲染
-- **WHEN** `data.features` 非空
-- **THEN** 側邊欄 SHALL 為每個 feature 顯示一個列項, 內容 SHALL 至少包含: 與地圖標記同色的色點、`properties.fireType` (或 `properties.title` 作為 fallback)、`properties.endPointInfo`、`properties.featureId` 與該 feature 之 `caseList` 數量
+#### Scenario: 兩個群組同時渲染
+- **WHEN** 頁面 mount 完成且 `data.features` 與 `/api/monitor-points` 皆回傳非空清單
+- **THEN** 側邊欄 SHALL 在頂部顯示「災情狀況 (N)」群組標頭與「自設追蹤 (M)」群組標頭, N/M 為各自項目數; 預設兩群組 SHALL 皆為展開狀態 (除非 `localStorage` 另有記錄)
 
-#### Scenario: 點擊清單項目定位地圖
-- **WHEN** 使用者點擊清單中任一項目
+#### Scenario: 摺疊群組
+- **WHEN** 使用者點擊任一群組標頭 (或標頭內的箭頭/按鈕)
+- **THEN** 該群組 SHALL 切換 expand/collapse 狀態; collapsed 狀態 SHALL 隱藏其項目清單但 SHALL 保留標頭與計數; 另一群組 SHALL 不受影響
+
+#### Scenario: 摺疊狀態跨重整保留
+- **WHEN** 使用者摺疊任一群組後重新載入頁面
+- **THEN** 側邊欄 SHALL 從 `localStorage` 讀取 `rescue-map.sidebar.groups` 並還原該摺疊狀態; 讀取失敗或 key 不存在時 SHALL 套用預設 (皆展開), 不 SHALL 拋例外
+
+#### Scenario: 災情狀況項目渲染
+- **WHEN** `data.features` 非空且災情群組為展開
+- **THEN** 該群組 SHALL 為每個 feature 顯示一個列項, 內容 SHALL 至少包含: 與地圖標記同色的色點、`properties.fireType` (或 `properties.title` 作為 fallback)、`properties.endPointInfo`、`properties.featureId` 與該 feature 之 `caseList` 數量
+
+#### Scenario: 自設追蹤項目渲染
+- **WHEN** `/api/monitor-points` 回傳 M 筆且自設群組為展開
+- **THEN** 該群組 SHALL 為每個自設點顯示一個列項, 內容 SHALL 至少包含: 名稱、座標 (小數至 6 位) 與 `radius` (公尺整數, 例如「1000 m」); 每項 SHALL 以與地圖 marker 一致的識別色標示
+
+#### Scenario: 點擊災情項目定位地圖
+- **WHEN** 使用者點擊災情狀況群組中任一項目
 - **THEN** 地圖 SHALL `setView` 至該事件座標 (zoom level 至少為 15), 該事件主標記的 popup SHALL 自動開啟, 且該清單項目在側邊欄中 SHALL 顯示為選取狀態 (與其他項目視覺上有所區別)
 
-#### Scenario: 空清單顯示提示
-- **WHEN** `data.features` 為空
-- **THEN** 側邊欄 SHALL 顯示「目前無事件」文字, 且 SHALL 不渲染任何列項
+#### Scenario: 空群組顯示提示
+- **WHEN** 任一群組對應資料為空 (例如無事件或無自設點)
+- **THEN** 該群組於展開狀態下 SHALL 顯示對應空狀態文字 (災情: 「目前無事件」; 自設追蹤: 「尚未新增自設追蹤點」), 並 SHALL 不渲染任何列項; 群組標頭計數 SHALL 為 0
 
-#### Scenario: 標題顯示事件總數
+#### Scenario: 標頭顯示各群組總數
 - **WHEN** 側邊欄渲染
-- **THEN** 側邊欄標頭 SHALL 顯示當前 `data.features` 的總數 (例如「事件清單 (3)」)
+- **THEN** 災情狀況標頭 SHALL 顯示當前 `data.features` 的總數 (例如「災情狀況 (3)」), 自設追蹤標頭 SHALL 顯示當前自設點數量 (例如「自設追蹤 (2)」)
 
 ### Requirement: 開發環境 API proxy
 專案 SHALL 在 Vite 設定中將 `/api` 開頭的請求 proxy 到後端開發伺服器 (`http://localhost:5129`), 使前端在開發階段能以相對路徑呼叫 API 而無需設定 CORS.
@@ -113,3 +127,65 @@
 #### Scenario: 後端未啟動
 - **WHEN** 開發者執行 `pnpm dev` 但後端未啟動
 - **THEN** 前端 fetch SHALL 失敗 (例如 ECONNREFUSED), 並 SHALL 依「網路或其他錯誤」情境在 UI 顯示錯誤, 不 SHALL 導致頁面崩潰
+
+### Requirement: 設定頁導覽入口
+救援地圖頁面 (`/`) SHALL 在頂部狀態列或標題列加入「設定」連結 (或圖示按鈕), 點擊後 SHALL 透過 vue-router 導覽至 `/settings`, SHALL NOT 觸發整頁重新載入.
+
+#### Scenario: 點擊設定連結
+- **WHEN** 使用者於救援地圖頁面點擊「設定」連結
+- **THEN** 系統 SHALL 透過 `router.push('/settings')` 導覽至設定頁, 瀏覽器網址列 SHALL 變為 `/settings`, SHALL NOT 觸發整頁 reload
+
+#### Scenario: 鍵盤可達
+- **WHEN** 使用者以 Tab 鍵聚焦於設定連結並按 Enter
+- **THEN** 系統 SHALL 與滑鼠點擊相同地導覽至 `/settings`
+
+### Requirement: 監測點覆蓋圖層
+救援地圖 SHALL 在既有救援事件圖層之外, 額外渲染由 `GET /api/monitor-points` 取得的監測點作為獨立圖層; 監測點圖示 SHALL 視覺上與救援事件 marker 可區分 (例如不同顏色或形狀), 並 SHALL 在地圖縮放或重新渲染救援資料時保持不被覆蓋.
+
+#### Scenario: 同時顯示兩種資料
+- **WHEN** 救援地圖頁面同時取得救援事件與監測點清單
+- **THEN** 地圖 SHALL 同時渲染兩種 marker, 兩種 marker SHALL 視覺上可區分
+
+#### Scenario: 救援資料重整不影響監測點
+- **WHEN** 救援事件圖層因 polling 重新整理 (clearLayers + 重新加入)
+- **THEN** 監測點圖層 SHALL 維持顯示, SHALL NOT 因救援資料更新被誤刪
+
+#### Scenario: 無監測點時不渲染
+- **WHEN** `/api/monitor-points` 回傳空陣列
+- **THEN** 地圖 SHALL 僅顯示救援事件 (若有), SHALL NOT 因空監測點清單拋出例外
+
+### Requirement: 自設追蹤點選取與 hover 顯示半徑圓圈
+側邊欄「自設追蹤」群組與地圖上對應 marker SHALL 共用一個「focused monitor point」狀態 (由父元件持有), 當使用者 hover 或點擊 (pin) 任一自設點 (從清單或從地圖 marker 任一來源) 時且使用者偏好 `showRangeCircle` 為 true, 主地圖 SHALL 於該自設點座標繪製一個半徑等於該點 `radius` (公尺) 的半透明圓圈 (`L.circle`, fillOpacity 約 0.08, stroke opacity 約 0.4, `interactive: false`); 取消 hover 且未 pin 時圓圈 SHALL 消失. 自設追蹤群組 SHALL 於群組標題下方提供一個「顯示範圍圓圈」checkbox, 預設勾選, 狀態 SHALL 透過 `localStorage` (key 例如 `rescue-map.sidebar.monitor-options`) 持久化; 當 checkbox 取消勾選時, 即使使用者 hover/pin 自設點, 主地圖 SHALL NOT 繪製半徑圓圈, 已存在的圓圈 SHALL 立即移除.
+
+#### Scenario: hover 清單項目顯示圓圈
+- **WHEN** 使用者將滑鼠移入自設追蹤群組中任一項目
+- **THEN** 主地圖 SHALL 立即於該自設點座標繪製半徑圓圈 (公尺單位等於該點 radius), 並 SHALL 將地圖視角 panTo 至該點 (zoom 維持不變)
+
+#### Scenario: 離開 hover 收回圓圈
+- **WHEN** 使用者將滑鼠移出該項目且該項目未被 pin
+- **THEN** 圓圈 SHALL 自地圖移除, 地圖視角 SHALL 不再 panTo
+
+#### Scenario: 點擊 pin 該自設點
+- **WHEN** 使用者點擊自設追蹤群組中任一項目
+- **THEN** 該項目 SHALL 成為 pinned 狀態 (視覺上與其他項目區別, 類似災情項目 active 樣式), 圓圈 SHALL 保持顯示直到 (a) 使用者再次點擊該項目, (b) 點擊另一自設點, 或 (c) 點擊一個災情項目, 任一情況皆 SHALL 取消 pin
+
+#### Scenario: 地圖 marker hover 顯示圓圈
+- **WHEN** 使用者將滑鼠移入主地圖上某自設點 marker
+- **THEN** 系統 SHALL 與清單 hover 相同地顯示該點半徑圓圈; 對應清單項目 SHALL 同步以視覺方式提示 (例如 hover 樣式)
+
+#### Scenario: 切換另一自設點
+- **WHEN** 已有某自設點 pinned 而使用者 hover 另一自設點
+- **THEN** 圓圈 SHALL 顯示「pinned 點」的圓圈 (pin 優先於 hover), 但 hover 的清單項目 SHALL 顯示 hover 樣式; 若使用者點擊新項目則 pin SHALL 切換至新點並重畫圓圈
+
+#### Scenario: 大量自設點時繪製單一圓圈
+- **WHEN** 自設點有 N 筆而 `focusedMonitorId` 變更
+- **THEN** 系統 SHALL 僅維護一個 `L.circle` layer (重複使用, 透過 `setLatLng` 與 `setRadius` 更新), SHALL NOT 為每次切換建立新 layer 物件
+
+#### Scenario: 取消勾選「顯示範圍圓圈」
+- **WHEN** 使用者於自設追蹤群組取消「顯示範圍圓圈」checkbox
+- **THEN** 主地圖目前若有半徑圓圈 SHALL 立即移除, 後續任何 hover/pin 自設點操作 SHALL NOT 繪製圓圈; checkbox 狀態 SHALL 寫入 `localStorage`, 重新整理頁面後 SHALL 保留為未勾選
+
+#### Scenario: 重新勾選「顯示範圍圓圈」
+- **WHEN** 使用者再次勾選「顯示範圍圓圈」checkbox, 且目前已有某自設點處於 hover 或 pin 狀態
+- **THEN** 主地圖 SHALL 立即於該點座標繪製半徑圓圈; 若目前無任何 focused 自設點則 SHALL 不繪製, 但後續 hover/pin 操作 SHALL 恢復繪製
+

@@ -9,6 +9,11 @@ const router = createRouter({
       name: 'rescue-map',
       component: RescueMapView,
     },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView.vue'),
+    },
   ],
 });
 

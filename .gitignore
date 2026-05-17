@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# MonitorPointStore runtime data
+src/WebApi/data/*.json
+src/WebApi/data/*.json.corrupt-*
