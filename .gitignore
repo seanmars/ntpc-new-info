@@ -482,5 +482,6 @@ $RECYCLE.BIN/
 *.swp
 
 # MonitorPointStore runtime data
-src/WebApi/data/*.json
-src/WebApi/data/*.json.corrupt-*
+discord-settings.json
+monitor-points.json
+*.json.corrupt-*

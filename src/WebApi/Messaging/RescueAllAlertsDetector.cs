@@ -20,7 +20,6 @@ public sealed class RescueAllAlertsDetector(
         var settings = await settingsStore.GetAsync(ct);
         if (!settings.Enabled || !settings.NotifyAllAlerts)
         {
-            // Reset so that re-enabling later treats the current snapshot as fresh.
             lock (_seenGate)
             {
                 if (_seenFeatureIds.Count > 0)
@@ -41,6 +40,7 @@ public sealed class RescueAllAlertsDetector(
 
         var currentIds = new HashSet<string>(StringComparer.Ordinal);
         var newAlerts = new List<NewAlert>();
+        var skippedNoId = 0;
 
         var featureIndex = -1;
         foreach (var featureNode in features)
@@ -54,9 +54,7 @@ public sealed class RescueAllAlertsDetector(
             var featureId = ExtractFeatureId(featureNode);
             if (string.IsNullOrEmpty(featureId))
             {
-                logger.LogDebug(
-                    "RescueAllAlertsDetector: feature at index {FeatureIndex} has no id; skipping for dedup",
-                    featureIndex);
+                skippedNoId++;
                 continue;
             }
 
@@ -77,6 +75,10 @@ public sealed class RescueAllAlertsDetector(
         {
             _seenFeatureIds = currentIds;
         }
+
+        logger.LogInformation(
+            "RescueAllAlertsDetector: scanned {Total} features (new={New}, skipped-no-id={Skipped}, current-ids={CurrentIds})",
+            featureIndex + 1, newAlerts.Count, skippedNoId, currentIds.Count);
 
         if (newAlerts.Count == 0)
         {
