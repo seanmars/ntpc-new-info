@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 
+using Rebus.Bus;
 using Rebus.Config;
 using Rebus.ServiceProvider;
 using Rebus.Transport.InMem;
@@ -72,6 +73,12 @@ builder.Services.AddHostedService<RescuePollingService>();
 builder.Services.AddHostedService<DiscordBotLifecycleService>();
 
 var app = builder.Build();
+
+// Rebus pub/sub requires explicit Subscribe per message type; auto-registering
+// IHandleMessages<T> only wires DI, it does not subscribe the topic.
+var bus = app.Services.GetRequiredService<IBus>();
+await bus.Subscribe<RescueAllAlertsDetected>();
+await bus.Subscribe<MonitorPointEventDetected>();
 
 app.MapDefaultEndpoints();
 
