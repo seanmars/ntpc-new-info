@@ -111,7 +111,7 @@ public sealed class DiscordSettingsStore : IDiscordSettingsStore
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "DiscordSettingsStore: failed to delete '{Path}' during reset; in-memory state is now default.", path);
+            _logger.LogWarning(ex, "DiscordSettingsStore: failed to delete '{Path}' during reset; in-memory state is now default", path);
         }
     }
 
@@ -128,7 +128,7 @@ public sealed class DiscordSettingsStore : IDiscordSettingsStore
         var path = ResolveFilePath();
         if (!File.Exists(path))
         {
-            _logger.LogInformation("DiscordSettingsStore: file '{Path}' not found; starting with default disabled settings.", path);
+            _logger.LogInformation("DiscordSettingsStore: file '{Path}' not found; starting with default disabled settings", path);
             return;
         }
 
@@ -139,7 +139,7 @@ public sealed class DiscordSettingsStore : IDiscordSettingsStore
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "DiscordSettingsStore: failed to read '{Path}'; starting with default disabled settings.", path);
+            _logger.LogError(ex, "DiscordSettingsStore: failed to read '{Path}'; starting with default disabled settings", path);
             return;
         }
 
@@ -150,7 +150,7 @@ public sealed class DiscordSettingsStore : IDiscordSettingsStore
             {
                 _settings = parsed;
                 _logger.LogInformation(
-                    "DiscordSettingsStore: loaded settings from '{Path}' (enabled={Enabled}, hasToken={HasToken}, channelId={ChannelId}).",
+                    "DiscordSettingsStore: loaded settings from '{Path}' (enabled={Enabled}, hasToken={HasToken}, channelId={ChannelId})",
                     path, _settings.Enabled, !string.IsNullOrEmpty(_settings.BotToken), _settings.ChannelId);
             }
         }
@@ -163,14 +163,14 @@ public sealed class DiscordSettingsStore : IDiscordSettingsStore
                 File.Move(path, quarantine, overwrite: false);
                 _logger.LogError(
                     ex,
-                    "DiscordSettingsStore: '{Path}' is not valid JSON; quarantined to '{Quarantine}'. Starting with default disabled settings.",
+                    "DiscordSettingsStore: '{Path}' is not valid JSON; quarantined to '{Quarantine}'. Starting with default disabled settings",
                     path, quarantine);
             }
             catch (Exception moveEx)
             {
                 _logger.LogError(
                     moveEx,
-                    "DiscordSettingsStore: '{Path}' is not valid JSON and could not be quarantined. Starting with default disabled settings.",
+                    "DiscordSettingsStore: '{Path}' is not valid JSON and could not be quarantined. Starting with default disabled settings",
                     path);
             }
         }

@@ -11,13 +11,14 @@ public sealed class RescuePollingService(
     RescueDataFetcher fetcher,
     IRescueSnapshotStore store,
     IMonitorPointEventDetector detector,
+    IRescueAllAlertsDetector allAlertsDetector,
     IOptionsMonitor<RescuePollingOptions> options,
     ILogger<RescuePollingService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = options.CurrentValue.Interval;
-        logger.LogInformation("RescuePollingService starting with interval {Interval}.", interval);
+        var interval = TimeSpan.FromSeconds(options.CurrentValue.IntervalSeconds);
+        logger.LogInformation("RescuePollingService starting with interval {Interval}", interval);
 
         await PollOnceAsync(stoppingToken);
 
@@ -33,7 +34,7 @@ public sealed class RescuePollingService(
         {
         }
 
-        logger.LogInformation("RescuePollingService stopped.");
+        logger.LogInformation("RescuePollingService stopped");
     }
 
     private async Task PollOnceAsync(CancellationToken ct)
@@ -47,7 +48,7 @@ public sealed class RescuePollingService(
             store.SetSuccess(data);
 
             logger.LogInformation(
-                "Rescue poll succeeded from {Url} in {ElapsedMs} ms.",
+                "Rescue poll succeeded from {Url} in {ElapsedMs} ms",
                 url, (DateTimeOffset.UtcNow - started).TotalMilliseconds);
 
             var fetchedAt = store.Current.FetchedAt ?? DateTimeOffset.UtcNow;
@@ -60,7 +61,7 @@ public sealed class RescuePollingService(
         catch (Exception ex)
         {
             store.SetFailure(ex.Message);
-            logger.LogError(ex, "Rescue poll failed against {Url}.", url);
+            logger.LogError(ex, "Rescue poll failed against {Url}", url);
         }
     }
 
@@ -76,7 +77,20 @@ public sealed class RescuePollingService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Monitor point event detection failed.");
+            logger.LogError(ex, "Monitor point event detection failed");
+        }
+
+        try
+        {
+            await allAlertsDetector.DetectAndPublishAsync(data, fetchedAt, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rescue all-alerts detection failed");
         }
     }
 }

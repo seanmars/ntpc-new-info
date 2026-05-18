@@ -8,7 +8,7 @@ var webapi = builder
     .AddProject<Projects.WebApi>("webapi")
     .PublishAsDockerFile();
 
-builder.AddViteApp("vue-app", workingDirectory: "../vue-app", packageManager: "pnpm")
+builder.AddViteApp("vue-app", workingDirectory: "../../vue-app", packageManager: "pnpm")
     .WithReference(webapi)
     .WaitFor(webapi)
     .PublishAsDockerFile();

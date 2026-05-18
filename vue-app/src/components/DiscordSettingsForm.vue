@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { testDiscordSettings } from '@/api/discordSettings';
 import type {
   DiscordSettingsUpdateInput,
   DiscordSettingsView,
@@ -18,9 +19,13 @@ const emit = defineEmits<{
 }>();
 
 const enabled = ref(false);
+const notifyAllAlerts = ref(false);
 const channelIdInput = ref<string>('');
 const newTokenInput = ref<string>('');
 const tokenInput = ref<HTMLInputElement | null>(null);
+
+const testing = ref(false);
+const testResult = ref<{ tone: 'ok' | 'error'; message: string } | null>(null);
 
 const tokenPlaceholder = computed(() => {
   const preview = props.current?.tokenPreview;
@@ -32,13 +37,12 @@ const hasStoredToken = computed(() => Boolean(props.current?.hasToken));
 
 const willHaveToken = computed(() => newTokenInput.value.length > 0 || hasStoredToken.value);
 
-const channelIdValue = computed(() => {
+const channelIdValue = computed<string | null>(() => {
   const raw = channelIdInput.value.trim();
   if (raw === '') return null;
   if (!/^\d+$/.test(raw)) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return null;
-  return n;
+  if (/^0+$/.test(raw)) return null;
+  return raw.replace(/^0+/, '');
 });
 
 const channelIdError = computed<string | null>(() => {
@@ -62,6 +66,17 @@ const canSubmit = computed(() => {
   return true;
 });
 
+const canTest = computed(() => {
+  if (testing.value || props.submitting) return false;
+  if (channelIdValue.value === null) return false;
+  if (!willHaveToken.value) return false;
+  return true;
+});
+
+watch([newTokenInput, channelIdInput], () => {
+  testResult.value = null;
+});
+
 watch(
   () => props.open,
   async (opened) => {
@@ -76,21 +91,49 @@ watch(
 function resetForm() {
   const current = props.current;
   enabled.value = current?.enabled ?? false;
-  channelIdInput.value = current && current.channelId > 0 ? String(current.channelId) : '';
+  notifyAllAlerts.value = current?.notifyAllAlerts ?? false;
+  channelIdInput.value =
+    current && current.channelId !== '' && current.channelId !== '0' ? current.channelId : '';
   newTokenInput.value = '';
+  testResult.value = null;
 }
 
 function close() {
   newTokenInput.value = '';
+  testResult.value = null;
   emit('close');
+}
+
+async function runTest() {
+  if (!canTest.value) return;
+  const channelId = channelIdValue.value ?? '0';
+  testing.value = true;
+  testResult.value = null;
+  try {
+    const result = await testDiscordSettings({
+      channelId,
+      botToken: newTokenInput.value.length > 0 ? newTokenInput.value : undefined,
+    });
+    if (result.status === 'ok') {
+      testResult.value = {
+        tone: result.body.success ? 'ok' : 'error',
+        message: result.body.message,
+      };
+    } else {
+      testResult.value = { tone: 'error', message: result.error };
+    }
+  } finally {
+    testing.value = false;
+  }
 }
 
 function submit() {
   if (!canSubmit.value) return;
-  const channelId = channelIdValue.value ?? 0;
+  const channelId = channelIdValue.value ?? '0';
   const input: DiscordSettingsUpdateInput = {
     enabled: enabled.value,
     channelId,
+    notifyAllAlerts: notifyAllAlerts.value,
     botToken: newTokenInput.value.length > 0 ? newTokenInput.value : undefined,
   };
   emit('submit', input);
@@ -98,7 +141,7 @@ function submit() {
 </script>
 
 <template>
-  <div v-if="open" class="ds-form-backdrop" role="presentation" @click.self="close">
+  <div v-if="open" class="ds-form-backdrop" role="presentation">
     <div class="ds-form" role="dialog" aria-modal="true" aria-labelledby="ds-form-title">
       <header class="ds-form__header">
         <h2 id="ds-form-title" class="ds-form__title">Discord 通知設定</h2>
@@ -109,6 +152,16 @@ function submit() {
         <label class="ds-form__check">
           <input v-model="enabled" type="checkbox" />
           <span>啟用 Discord 通知</span>
+        </label>
+
+        <label class="ds-form__check">
+          <input v-model="notifyAllAlerts" type="checkbox" :disabled="!enabled" />
+          <span>
+            通知所有災訊
+            <span class="ds-form__hint ds-form__hint--inline">
+              (啟用後不論是否有監測點, 所有新災訊都會發送通知)
+            </span>
+          </span>
         </label>
 
         <label class="ds-form__field">
@@ -139,10 +192,27 @@ function submit() {
           <span v-if="channelIdError" class="ds-form__error">{{ channelIdError }}</span>
         </label>
 
+        <p
+          v-if="testResult"
+          class="ds-form__test-result"
+          :class="`ds-form__test-result--${testResult.tone}`"
+        >
+          {{ testResult.message }}
+        </p>
+
         <p v-if="submitError" class="ds-form__submit-error">儲存失敗: {{ submitError }}</p>
       </div>
 
       <footer class="ds-form__footer">
+        <button
+          type="button"
+          class="ds-form__secondary ds-form__test"
+          :disabled="!canTest"
+          @click="runTest"
+        >
+          {{ testing ? '測試中...' : '測試連線' }}
+        </button>
+        <div class="ds-form__footer-spacer"></div>
         <button type="button" class="ds-form__secondary" @click="close">取消</button>
         <button type="button" class="ds-form__primary" :disabled="!canSubmit" @click="submit">
           {{ submitting ? '儲存中...' : '儲存' }}
@@ -245,6 +315,11 @@ function submit() {
   color: #777;
 }
 
+.ds-form__hint--inline {
+  display: block;
+  margin-top: 2px;
+}
+
 .ds-form__error {
   font-size: 11px;
   color: #c62828;
@@ -257,6 +332,24 @@ function submit() {
   background: #f8d7da;
   color: #721c24;
   border-radius: 4px;
+}
+
+.ds-form__test-result {
+  margin: 0;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  word-break: break-word;
+}
+
+.ds-form__test-result--ok {
+  background: #d4edda;
+  color: #1b5e20;
+}
+
+.ds-form__test-result--error {
+  background: #f8d7da;
+  color: #721c24;
 }
 
 .ds-form__footer {
@@ -290,5 +383,14 @@ function submit() {
   color: #333;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.ds-form__secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ds-form__footer-spacer {
+  flex: 1 1 auto;
 }
 </style>

@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="open" class="mp-form-backdrop" role="presentation" @click.self="close">
+  <div v-if="open" class="mp-form-backdrop" role="presentation">
     <div class="mp-form" role="dialog" aria-modal="true" aria-labelledby="mp-form-title">
       <header class="mp-form__header">
         <h2 id="mp-form-title" class="mp-form__title">{{ dialogTitle }}</h2>

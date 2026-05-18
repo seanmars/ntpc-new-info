@@ -18,13 +18,13 @@ public sealed class DiscordRestNotifier(
         var targetChannel = channelId ?? snapshot.ChannelId;
         if (targetChannel == 0UL)
         {
-            logger.LogWarning("DiscordRestNotifier: dropped message; no channel id available (request channel id=null, store channel id=0).");
+            logger.LogWarning("DiscordRestNotifier: dropped message; no channel id available (request channel id=null, store channel id=0)");
             return;
         }
 
         if (!state.IsReady || state.Client is null)
         {
-            logger.LogWarning("DiscordRestNotifier: dropped message to channel {ChannelId}; bot not ready.", targetChannel);
+            logger.LogWarning("DiscordRestNotifier: dropped message to channel {ChannelId}; bot not ready", targetChannel);
             return;
         }
 
@@ -32,7 +32,7 @@ public sealed class DiscordRestNotifier(
         if (rawChannel is not IMessageChannel messageChannel)
         {
             logger.LogWarning(
-                "DiscordRestNotifier: channel {ChannelId} is not a message channel (resolved type={ChannelType}); dropped message.",
+                "DiscordRestNotifier: channel {ChannelId} is not a message channel (resolved type={ChannelType}); dropped message",
                 targetChannel, rawChannel?.GetType().Name ?? "<null>");
             return;
         }

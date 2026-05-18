@@ -7,6 +7,7 @@ using Rebus.Transport.InMem;
 using Scalar.AspNetCore;
 
 using WebApi.Discord;
+using WebApi.Json;
 using WebApi.Messaging;
 using WebApi.Options;
 using WebApi.Services;
@@ -17,7 +18,12 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(opt =>
+    {
+        opt.JsonSerializerOptions.Converters.Add(new UInt64StringJsonConverter());
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -44,7 +50,7 @@ builder.Services.AddSingleton<IDiscordNotifier, DiscordRestNotifier>();
 builder.Services.AddHttpClient<RescueDataFetcher>((sp, client) =>
 {
     var opts = sp.GetRequiredService<IOptions<RescuePollingOptions>>().Value;
-    client.Timeout = opts.RequestTimeout;
+    client.Timeout = TimeSpan.FromSeconds(opts.RequestTimeoutSeconds);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("ntpc-new-info-backend/0.1");
 });
 
@@ -52,11 +58,12 @@ builder.Services.AddHttpClient<NominatimGeocoder>((sp, client) =>
 {
     var opts = sp.GetRequiredService<IOptions<NominatimOptions>>().Value;
     client.BaseAddress = new Uri(opts.BaseUrl.TrimEnd('/') + "/");
-    client.Timeout = opts.RequestTimeout;
+    client.Timeout = TimeSpan.FromSeconds(opts.RequestTimeoutSeconds);
     client.DefaultRequestHeaders.UserAgent.ParseAdd(opts.UserAgent);
 });
 
 builder.Services.AddSingleton<IMonitorPointEventDetector, MonitorPointEventDetector>();
+builder.Services.AddSingleton<IRescueAllAlertsDetector, RescueAllAlertsDetector>();
 builder.Services.AutoRegisterHandlersFromAssemblyOf<LoggingMonitorPointAlertHandler>();
 builder.Services.AddRebus(configure => configure
     .Transport(t => t.UseInMemoryTransport(new InMemNetwork(), "monitor-point-alerts")));

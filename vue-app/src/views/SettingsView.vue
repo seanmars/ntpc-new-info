@@ -192,11 +192,24 @@ function flashToast(tone: 'ok' | 'error', message: string) {
           <div class="ds-card__row">
             <span class="ds-card__label">Channel ID</span>
             <span class="ds-card__value">
-              {{ discordSettings.channelId > 0 ? discordSettings.channelId : '(未設定)' }}
+              {{
+                discordSettings.channelId && discordSettings.channelId !== '0'
+                  ? discordSettings.channelId
+                  : '(未設定)'
+              }}
+            </span>
+          </div>
+          <div class="ds-card__row">
+            <span class="ds-card__label">通知所有災訊</span>
+            <span
+              class="ds-badge"
+              :class="discordSettings.notifyAllAlerts ? 'ds-badge--ok' : 'ds-badge--muted'"
+            >
+              {{ discordSettings.notifyAllAlerts ? '已啟用' : '已停用' }}
             </span>
           </div>
           <div
-            v-if="discordSettings.hasToken || discordSettings.channelId > 0"
+            v-if="discordSettings.hasToken || (discordSettings.channelId && discordSettings.channelId !== '0')"
             class="ds-card__actions"
           >
             <button type="button" class="ds-card__delete" @click="handleDiscordDelete">

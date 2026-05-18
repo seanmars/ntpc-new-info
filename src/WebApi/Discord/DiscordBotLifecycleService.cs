@@ -52,7 +52,7 @@ public sealed class DiscordBotLifecycleService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "DiscordBotLifecycleService: error while disposing Discord client on shutdown.");
+            logger.LogWarning(ex, "DiscordBotLifecycleService: error while disposing Discord client on shutdown");
         }
     }
 
@@ -66,7 +66,7 @@ public sealed class DiscordBotLifecycleService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "DiscordBotLifecycleService: reconcile failed for SettingsChanged event.");
+                logger.LogError(ex, "DiscordBotLifecycleService: reconcile failed for SettingsChanged event");
             }
         });
     }
@@ -81,7 +81,7 @@ public sealed class DiscordBotLifecycleService(
                 if (state.Client is not null)
                 {
                     await DisposeClientLockedAsync();
-                    logger.LogInformation("DiscordBotLifecycleService: Discord notifications disabled; bot logged out.");
+                    logger.LogInformation("DiscordBotLifecycleService: Discord notifications disabled; bot logged out");
                 }
                 state.IsReady = false;
                 state.CurrentLoggedInToken = null;
@@ -106,7 +106,7 @@ public sealed class DiscordBotLifecycleService(
                 client.Dispose();
                 state.IsReady = false;
                 state.CurrentLoggedInToken = null;
-                logger.LogError(ex, "DiscordBotLifecycleService: failed to log in to Discord.");
+                logger.LogError(ex, "DiscordBotLifecycleService: failed to log in to Discord");
                 return;
             }
 
@@ -115,7 +115,7 @@ public sealed class DiscordBotLifecycleService(
             state.IsReady = true;
 
             logger.LogInformation(
-                "DiscordBotLifecycleService: logged in to Discord as {BotUsername}#{Discriminator}.",
+                "DiscordBotLifecycleService: logged in to Discord as {BotUsername}#{Discriminator}",
                 client.CurrentUser?.Username ?? "<unknown>",
                 client.CurrentUser?.Discriminator ?? "0000");
         }
@@ -135,7 +135,7 @@ public sealed class DiscordBotLifecycleService(
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "DiscordBotLifecycleService: logout threw; continuing to dispose.");
+            logger.LogDebug(ex, "DiscordBotLifecycleService: logout threw; continuing to dispose");
         }
 
         try
@@ -144,7 +144,7 @@ public sealed class DiscordBotLifecycleService(
         }
         catch (Exception ex)
         {
-            logger.LogDebug(ex, "DiscordBotLifecycleService: dispose threw; ignoring.");
+            logger.LogDebug(ex, "DiscordBotLifecycleService: dispose threw; ignoring");
         }
 
         state.Client = null;

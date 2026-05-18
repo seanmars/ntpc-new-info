@@ -8,7 +8,7 @@ public sealed class NominatimOptions
 
     public string UserAgent { get; set; } = "ntpc-new-info-backend/0.1";
 
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    public int RequestTimeoutSeconds { get; set; } = 10;
 
     public int MinIntervalMs { get; set; } = 1100;
 }

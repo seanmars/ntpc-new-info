@@ -104,7 +104,7 @@ public sealed class MonitorPointEventDetector(
             {
                 logger.LogError(
                     ex,
-                    "Failed to publish MonitorPointEventDetected for MonitorPointId={MonitorPointId}.",
+                    "Failed to publish MonitorPointEventDetected for MonitorPointId={MonitorPointId}",
                     mp.Id);
             }
         }
@@ -238,11 +238,24 @@ public sealed class MonitorPointEventDetector(
         var topId = featureNode["id"];
         if (topId is not null)
         {
-            return topId.ToString();
+            var s = topId.ToString();
+            if (!string.IsNullOrEmpty(s)) return s;
         }
-        var propId = featureNode["properties"]?["id"];
-        return propId?.ToString();
+
+        var props = featureNode["properties"];
+        if (props is null) return null;
+
+        foreach (var key in IdKeys)
+        {
+            var node = props[key];
+            if (node is null) continue;
+            var s = node.ToString();
+            if (!string.IsNullOrEmpty(s)) return s;
+        }
+        return null;
     }
+
+    private static readonly string[] IdKeys = { "featureId", "id", "caseId", "objectId", "OBJECTID" };
 
     private readonly record struct Vertex(double Latitude, double Longitude);
 }

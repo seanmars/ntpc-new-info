@@ -37,7 +37,7 @@ public sealed class GeocodeController(NominatimGeocoder geocoder, ILogger<Geocod
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Geocode search failed for query '{Query}'.", q);
+            logger.LogWarning(ex, "Geocode search failed for query '{Query}'", q);
             return StatusCode(StatusCodes.Status502BadGateway, new
             {
                 error = "upstream geocoder failed",

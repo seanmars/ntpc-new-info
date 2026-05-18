@@ -37,7 +37,7 @@ public sealed class DiscordMonitorPointAlertHandler(
 
             logger.LogWarning(
                 ex,
-                "DiscordMonitorPointAlertHandler: failed to send Discord notification for monitor point {MonitorPointId} to channel {ChannelId}; dropping message.",
+                "DiscordMonitorPointAlertHandler: failed to send Discord notification for monitor point {MonitorPointId} to channel {ChannelId}; dropping message",
                 message.MonitorPointId,
                 channelId);
         }

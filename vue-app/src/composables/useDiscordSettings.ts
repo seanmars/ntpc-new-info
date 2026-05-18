@@ -10,7 +10,8 @@ const DEFAULT_VIEW: DiscordSettingsView = {
   enabled: false,
   hasToken: false,
   tokenPreview: null,
-  channelId: 0,
+  channelId: '0',
+  notifyAllAlerts: false,
 };
 
 export type UpdateResult =

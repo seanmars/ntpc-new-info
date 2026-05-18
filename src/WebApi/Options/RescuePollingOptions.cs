@@ -6,7 +6,7 @@ public sealed class RescuePollingOptions
 
     public string UpstreamUrl { get; set; } = "https://e.ntpc.gov.tw/v3/api/map/dynamic/layer/rescue";
 
-    public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(5);
+    public int IntervalSeconds { get; set; } = 300;
 
-    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public int RequestTimeoutSeconds { get; set; } = 30;
 }

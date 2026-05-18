@@ -135,7 +135,7 @@ public sealed class MonitorPointStore : IMonitorPointStore
         var path = ResolveFilePath();
         if (!File.Exists(path))
         {
-            _logger.LogInformation("MonitorPointStore: file '{Path}' not found; starting with empty list.", path);
+            _logger.LogInformation("MonitorPointStore: file '{Path}' not found; starting with empty list", path);
             return;
         }
 
@@ -146,7 +146,7 @@ public sealed class MonitorPointStore : IMonitorPointStore
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "MonitorPointStore: failed to read '{Path}'; starting with empty list.", path);
+            _logger.LogError(ex, "MonitorPointStore: failed to read '{Path}'; starting with empty list", path);
             return;
         }
 
@@ -157,7 +157,7 @@ public sealed class MonitorPointStore : IMonitorPointStore
             {
                 _points.AddRange(parsed);
                 _logger.LogInformation(
-                    "MonitorPointStore: loaded {Count} monitor point(s) from '{Path}'.",
+                    "MonitorPointStore: loaded {Count} monitor point(s) from '{Path}'",
                     _points.Count, path);
             }
         }
@@ -170,14 +170,14 @@ public sealed class MonitorPointStore : IMonitorPointStore
                 File.Move(path, quarantine, overwrite: false);
                 _logger.LogError(
                     ex,
-                    "MonitorPointStore: '{Path}' is not valid JSON; quarantined to '{Quarantine}'. Starting with empty list.",
+                    "MonitorPointStore: '{Path}' is not valid JSON; quarantined to '{Quarantine}'. Starting with empty list",
                     path, quarantine);
             }
             catch (Exception moveEx)
             {
                 _logger.LogError(
                     moveEx,
-                    "MonitorPointStore: '{Path}' is not valid JSON and could not be quarantined. Starting with empty list.",
+                    "MonitorPointStore: '{Path}' is not valid JSON and could not be quarantined. Starting with empty list",
                     path);
             }
         }
