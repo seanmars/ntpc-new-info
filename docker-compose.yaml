@@ -1,0 +1,50 @@
+services:
+  env-dashboard:
+    image: "mcr.microsoft.com/dotnet/nightly/aspire-dashboard:latest"
+    environment:
+      DASHBOARD__FRONTEND__AUTHMODE: "Unsecured"
+      DASHBOARD__OTLP__AUTHMODE: "Unsecured"
+    ports:
+      - "18888"
+    expose:
+      - "18889"
+      - "18890"
+    networks:
+      - "aspire"
+    restart: "always"
+  webapi:
+    image: "${WEBAPI_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://env-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "webapi"
+    expose:
+      - "8080"
+    networks:
+      - "aspire"
+  vue-app:
+    image: "${VUE_APP_IMAGE}"
+    environment:
+      NODE_ENV: "production"
+      PORT: "8000"
+      WEBAPI_HTTP: "http://webapi:8080"
+      services__webapi__http__0: "http://webapi:8080"
+      WEBAPI_HTTPS: "https://webapi:8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://env-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "vue-app"
+    ports:
+      - "8000:8000"
+    expose:
+      - "8000"
+    depends_on:
+      webapi:
+        condition: "service_started"
+    networks:
+      - "aspire"
+networks:
+  aspire:
+    driver: "bridge"
