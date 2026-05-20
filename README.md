@@ -1,15 +1,15 @@
 # ntpc-new-info
 
-新北市政府開放資料的即時資訊整合平台. 目前以「救援事件動態圖層」為首個範例, 後端週期性拉取 NTPC 開放 API, 前端以 Leaflet 地圖視覺化呈現.
+新北市政府開放資料的即時資訊整合平台. 目前以「救援事件動態圖層」為第一個範例, 後端週期性抓取 NTPC 開放 API, 前端以 Leaflet 地圖視覺化呈現.
 
-## 技術棧
+## Technology Stack
 
 - **Orchestrator**: .NET Aspire 13.1.1 (AppHost)
 - **Backend**: ASP.NET Core (.NET 10) + Scalar OpenAPI
 - **Frontend**: Vue 3 + TypeScript + Vite 8 + Leaflet + Pinia + Vue Router
 - **Observability**: OpenTelemetry (透過 ServiceDefaults)
 
-## 專案結構
+## Project Structure
 
 ```
 ntpc-new-info/
@@ -21,13 +21,13 @@ ntpc-new-info/
 └── openspec/             # 規格文件 (specs)
 ```
 
-## 系統需求
+## Requirements
 
 - .NET 10 SDK
 - Node.js `^20.19.0 || >=22.12.0`
 - pnpm (vue-app 使用 pnpm 為套件管理工具)
 
-## 快速開始
+## Quick Start
 
 ### 1. 安裝前端相依套件
 
@@ -108,7 +108,7 @@ pnpm dev
 2. 將 bot 邀請到目標 Discord server, 確認 bot 在目標 channel 具有 `Send Messages` 權限.
 3. 啟動 WebApi, 於前端 `/settings` 頁開啟「Discord 通知」區塊, 填入 bot token + channel id 並勾選啟用.
 
-設定會永久化至 `src/WebApi/data/discord-settings.json` (已被 `.gitignore` 排除).
+設定會持久化至 `src/WebApi/data/discord-settings.json` (已被 `.gitignore` 排除).
 Token 預設不會回傳於 `GET /api/settings/discord`, 僅顯示末 4 碼遮罩預覽; 後續更新時若 token 欄位留空則保留既有值.
 
 ## 前端
@@ -130,20 +130,20 @@ pnpm lint         # oxlint + eslint
 pnpm format       # prettier
 ```
 
-## 建置與發佈
+## Container
+
+Copy and rename the `.env.example` to `.env`
 
 ```powershell
-# 後端
-dotnet build
-
-# 前端
-cd vue-app
-pnpm build
+# Just build the image and run with compose
+./build.ps1
+docker compose up -d
+# or
+podman compose up -d
 ```
 
-AppHost 已標註 `PublishAsDockerFile()`, 後續可透過 `aspire publish` 產出容器化部署清單.
 
-## 規格文件
+## Specs
 
 詳細功能需求與場景描述位於 `openspec/specs/`:
 
