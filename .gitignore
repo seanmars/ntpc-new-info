@@ -481,7 +481,10 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# MonitorPointStore runtime data
+# runtime data
 discord-settings.json
 monitor-points.json
 *.json.corrupt-*
+
+# container
+data/

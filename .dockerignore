@@ -24,3 +24,7 @@
 **/node_modules
 LICENSE
 README.md
+
+**/discord-settings.json
+**/monitor-points.json
+**/*.json.corrupt-*
