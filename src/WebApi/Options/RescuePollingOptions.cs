@@ -9,4 +9,6 @@ public sealed class RescuePollingOptions
     public int IntervalSeconds { get; set; } = 300;
 
     public int RequestTimeoutSeconds { get; set; } = 30;
+
+    public int ForceRefreshCooldownSeconds { get; set; } = 15;
 }

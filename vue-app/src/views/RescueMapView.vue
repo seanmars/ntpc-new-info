@@ -9,7 +9,17 @@ import type { RescueFeature } from '@/types/rescue';
 import type { MonitorPoint } from '@/types/monitorPoint';
 import { colorFor, featureKey } from '@/utils/rescue';
 
-const { featureCollection, meta, error, isLoading, lastFetchedAt, refresh } = useRescueData();
+const {
+  featureCollection,
+  meta,
+  error,
+  isLoading,
+  isForcing,
+  cooldownRemainingSeconds,
+  lastFetchedAt,
+  refresh,
+  forceRefresh,
+} = useRescueData();
 const { points: monitorPoints } = useMonitorPoints({ autoPoll: true });
 
 type SidebarGroup = 'rescue' | 'monitor';
@@ -124,12 +134,32 @@ function handleMapHoverMonitor(id: string | null) {
 
       <div class="status-bar__actions">
         <RouterLink to="/settings" class="status-bar__link">設定</RouterLink>
-        <button type="button" class="status-bar__refresh" :disabled="isLoading" @click="refresh">
+        <button
+          type="button"
+          class="status-bar__refresh"
+          :disabled="isLoading"
+          title="重新讀取後端 cache (不會向上游 NTPC 重抓)"
+          @click="refresh"
+        >
           {{ isLoading ? '載入中...' : '重新整理' }}
+        </button>
+        <button
+          type="button"
+          class="status-bar__refresh status-bar__refresh--force"
+          :disabled="isForcing || cooldownRemainingSeconds > 0"
+          title="強制 backend 向上游 NTPC 重抓最新資料"
+          @click="forceRefresh"
+        >
+          <template v-if="isForcing">強制更新中...</template>
+          <template v-else-if="cooldownRemainingSeconds > 0">強制更新 ({{ cooldownRemainingSeconds }}s)</template>
+          <template v-else>強制更新</template>
         </button>
       </div>
     </header>
 
+    <div v-if="cooldownRemainingSeconds > 0" class="banner banner--cooldown">
+      上游冷卻中, 剩餘 {{ cooldownRemainingSeconds }} 秒可再次強制更新
+    </div>
     <div v-if="isPending" class="banner banner--pending">資料尚未就緒, 將自動重試...</div>
     <div v-if="failure" class="banner banner--error">
       <strong>fetch 失敗:</strong> {{ failure.message }}
@@ -335,6 +365,16 @@ function handleMapHoverMonitor(id: string | null) {
   cursor: not-allowed;
 }
 
+.status-bar__refresh--force {
+  background: #e76f51;
+  border-color: #e76f51;
+}
+
+.status-bar__refresh--force:hover:not(:disabled) {
+  background: #d65a3c;
+  border-color: #d65a3c;
+}
+
 .banner {
   padding: 8px 16px;
   font-size: 13px;
@@ -345,6 +385,12 @@ function handleMapHoverMonitor(id: string | null) {
   background: #fff8e1;
   color: #6d4c41;
   border-bottom-color: #ffe082;
+}
+
+.banner--cooldown {
+  background: #e8eaf6;
+  color: #283593;
+  border-bottom-color: #c5cae9;
 }
 
 .banner--warning {

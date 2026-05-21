@@ -65,6 +65,7 @@ builder.Services.AddHttpClient<NominatimGeocoder>((sp, client) =>
 
 builder.Services.AddSingleton<IMonitorPointEventDetector, MonitorPointEventDetector>();
 builder.Services.AddSingleton<IRescueAllAlertsDetector, RescueAllAlertsDetector>();
+builder.Services.AddSingleton<IRescueRefreshCoordinator, RescueRefreshCoordinator>();
 builder.Services.AutoRegisterHandlersFromAssemblyOf<LoggingMonitorPointAlertHandler>();
 builder.Services.AddRebus(configure => configure
     .Transport(t => t.UseInMemoryTransport(new InMemNetwork(), "monitor-point-alerts")));
