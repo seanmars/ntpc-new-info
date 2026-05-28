@@ -13,11 +13,22 @@ public sealed class MonitorPointEventDetector(
     TimeProvider time,
     ILogger<MonitorPointEventDetector> logger) : IMonitorPointEventDetector
 {
+    private readonly object _seenGate = new();
+    // Per monitor point: feature ids already notified while still in range. Replaced wholesale each run.
+    private Dictionary<string, HashSet<string>> _seenByMonitorPoint = new(StringComparer.Ordinal);
+
     public async Task DetectAndPublishAsync(JsonNode snapshotData, DateTimeOffset snapshotFetchedAt, CancellationToken ct)
     {
         var monitorPoints = await monitorPointStore.GetAllAsync(ct);
         if (monitorPoints.Count == 0)
         {
+            lock (_seenGate)
+            {
+                if (_seenByMonitorPoint.Count > 0)
+                {
+                    _seenByMonitorPoint = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                }
+            }
             return;
         }
 
@@ -73,15 +84,52 @@ public sealed class MonitorPointEventDetector(
             }
         }
 
-        if (hitsByMonitorPoint.Count == 0)
+        var now = time.GetUtcNow();
+
+        Dictionary<string, HashSet<string>> previousSeen;
+        lock (_seenGate)
         {
-            return;
+            previousSeen = _seenByMonitorPoint;
         }
 
-        var now = time.GetUtcNow();
+        // Rebuilt from current monitor points only, so deleted points drop their state.
+        var updatedSeen = new Dictionary<string, HashSet<string>>(monitorPoints.Count, StringComparer.Ordinal);
+
         foreach (var mp in monitorPoints)
         {
-            if (!hitsByMonitorPoint.TryGetValue(mp.Id, out var matched) || matched.Count == 0)
+            hitsByMonitorPoint.TryGetValue(mp.Id, out var matched);
+
+            var currentIds = new HashSet<string>(StringComparer.Ordinal);
+            if (matched is not null)
+            {
+                foreach (var f in matched)
+                {
+                    if (!string.IsNullOrEmpty(f.FeatureId))
+                    {
+                        currentIds.Add(f.FeatureId);
+                    }
+                }
+            }
+            updatedSeen[mp.Id] = currentIds;
+
+            if (matched is null || matched.Count == 0)
+            {
+                continue;
+            }
+
+            previousSeen.TryGetValue(mp.Id, out var previous);
+
+            var newFeatures = new List<MatchedFeature>(matched.Count);
+            foreach (var f in matched)
+            {
+                // Features without a resolvable id are treated as new on every detection.
+                if (string.IsNullOrEmpty(f.FeatureId) || previous is null || !previous.Contains(f.FeatureId))
+                {
+                    newFeatures.Add(f);
+                }
+            }
+
+            if (newFeatures.Count == 0)
             {
                 continue;
             }
@@ -92,7 +140,7 @@ public sealed class MonitorPointEventDetector(
                 MonitorPointLatitude: mp.Latitude,
                 MonitorPointLongitude: mp.Longitude,
                 MonitorPointRadius: mp.Radius,
-                MatchedFeatures: matched,
+                MatchedFeatures: newFeatures,
                 DetectedAt: now,
                 SnapshotFetchedAt: snapshotFetchedAt);
 
@@ -107,6 +155,11 @@ public sealed class MonitorPointEventDetector(
                     "Failed to publish MonitorPointEventDetected for MonitorPointId={MonitorPointId}",
                     mp.Id);
             }
+        }
+
+        lock (_seenGate)
+        {
+            _seenByMonitorPoint = updatedSeen;
         }
     }
 
